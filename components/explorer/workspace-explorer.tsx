@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useDeferredValue, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 
-import { CloseIcon, FolderOpenIcon, SearchIcon } from "@/components/ui/icons";
+import { cn } from "@/lib/cn";
+import { CloseIcon, FolderOpenIcon, MenuIcon, SearchIcon } from "@/components/ui/icons";
 import { useWorkspace } from "@/components/workspace-provider";
 import { Breadcrumbs } from "./breadcrumbs";
 import { DialogManager } from "./dialog-manager";
@@ -28,6 +29,8 @@ export function WorkspaceExplorer() {
 function ExplorerLayout() {
   const { breadcrumb, openFile, openFolder } = useWorkspace();
   const [query, setQuery] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Searching stays responsive on large trees: typing is never blocked by the
   // result list re-rendering.
@@ -36,9 +39,55 @@ function ExplorerLayout() {
 
   const clearSearch = useCallback(() => setQuery(""), []);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable === true;
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+        return;
+      }
+
+      if (event.key === "/" && !typing) {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Escape closes the mobile drawer wherever the focus happens to be.
+  useEffect(() => {
+    if (!drawerOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDrawerOpen(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [drawerOpen]);
+
   return (
     <div className="flex h-dvh min-h-[32rem] flex-col bg-slate-50 text-slate-800">
       <header className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-5">
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Show folders"
+          className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 lg:hidden"
+        >
+          <MenuIcon className="h-5 w-5" />
+        </button>
+
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white">
             <FolderOpenIcon className="h-4 w-4" />
@@ -57,6 +106,7 @@ function ExplorerLayout() {
           <div className="relative w-full">
             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
+              ref={searchRef}
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -88,6 +138,44 @@ function ExplorerLayout() {
         <aside className="hidden w-64 shrink-0 border-r border-slate-200 lg:block xl:w-72">
           <Sidebar />
         </aside>
+
+        {/* Off-canvas version of the same tree for narrow screens. */}
+        <div
+          className={cn(
+            "fixed inset-0 z-40 lg:hidden",
+            drawerOpen ? "pointer-events-auto" : "pointer-events-none",
+          )}
+          aria-hidden={!drawerOpen}
+        >
+          <div
+            onClick={() => setDrawerOpen(false)}
+            className={cn(
+              "absolute inset-0 bg-slate-900/30 transition-opacity",
+              drawerOpen ? "opacity-100" : "opacity-0",
+            )}
+          />
+          <div
+            className={cn(
+              "absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col border-r border-slate-200 bg-white shadow-xl transition-transform duration-200",
+              drawerOpen ? "translate-x-0" : "-translate-x-full",
+            )}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+              <span className="text-sm font-semibold text-slate-900">Workspace</span>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                aria-label="Hide folders"
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <CloseIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1">
+              <Sidebar onNavigate={() => setDrawerOpen(false)} />
+            </div>
+          </div>
+        </div>
 
         <main className="flex min-w-0 flex-1 flex-col bg-white">
           <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-slate-100 px-3 py-2 sm:px-6">
