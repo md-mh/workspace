@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { ReactNode } from "react";
 
 import { createId } from "@/lib/id";
 import { createEmptyWorkspace, createSeedWorkspace } from "@/lib/seed";
@@ -57,7 +58,7 @@ interface WorkspaceContextValue {
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
-export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
+export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(workspaceReducer, undefined, createEmptyWorkspace);
   const [hydrated, setHydrated] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
